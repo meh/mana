@@ -41,9 +41,7 @@ defmodule Mana.DSL do
       module = Module.concat(Mana.Plugin, unquote(module))
 
       defmodule module do
-        @behaviour Mana.Plugin
-
-        alias Mana.Event
+        use Mana.Plugin
 
         unquote(block)
       end

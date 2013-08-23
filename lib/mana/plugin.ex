@@ -5,6 +5,30 @@ defmodule Mana.Plugin do
   defcallback handle(record, term) :: { :ok, term } | { :error, term }
   defcallback call(term, term) :: { :ok, term, term } | { :error, term }
 
+  defmacro __using__(_opts) do
+    quote do
+      alias Mana.Event
+
+      @behaviour Mana.Plugin
+
+      def init(_options) do
+        { :ok, nil }
+      end
+
+      def handle(_, state) do
+        { :ok, state }
+      end
+
+      def call(_, state) do
+        { :error, :unimplemented, state }
+      end
+
+      defoverridable init: 1
+      defoverridable handle: 2
+      defoverridable call: 2
+    end
+  end
+
   use GenServer.Behaviour
 
   defrecord State, options: nil, plugins: []
