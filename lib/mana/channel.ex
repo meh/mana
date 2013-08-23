@@ -12,3 +12,9 @@ defrecord Mana.Channel, server: nil, name: nil, plugins: [] do
     server.send "PRIVMSG #{name} :#{what}"
   end
 end
+
+defimpl String.Chars, for: Mana.Channel do
+  def to_string(Mana.Channel[name: name]) do
+    name
+  end
+end
