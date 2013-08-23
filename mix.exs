@@ -19,6 +19,7 @@ defmodule Mana.Mixfile do
   # { :foobar, "~> 0.1", git: "https://github.com/elixir-lang/foobar.git" }
   defp deps do
     [ { :socket, github: "meh/elixir-socket" },
-      { :dexts, github: "meh/dexts" } ]
+      { :dexts, github: "meh/dexts" },
+      { :continuum, github: "meh/continuum" } ]
   end
 end
