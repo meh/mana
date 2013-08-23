@@ -2,15 +2,13 @@ defmodule Mana.Plugin do
   use Behaviour
 
   defcallback init(Keyword.t) :: { :ok, term } | { :error, term }
-  defcallback handle(Mana.Event.t, term) :: { :ok, term } | { :error, term }
+  defcallback handle(record, term) :: { :ok, term } | { :error, term }
   defcallback call(term, term) :: { :ok, term, term } | { :error, term }
 
   use GenServer.Behaviour
 
   defrecord State, options: nil, plugins: []
   defrecord Plugin, name: nil, module: nil, state: nil
-
-  alias Mana.Event
 
   def start_link(options) do
     :gen_server.start_link({ :local, __MODULE__ }, __MODULE__, options, [])
@@ -24,6 +22,10 @@ defmodule Mana.Plugin do
 
   def call(what) do
     :gen_server.call(__MODULE__, what)
+  end
+
+  def call(plugin, what) do
+    :gen_server.call(__MODULE__, { :call, plugin, what })
   end
 
   def handle_call({ :register, name, module }, _from, State[options: options, plugins: plugins] = state) do
@@ -69,29 +71,54 @@ defmodule Mana.Plugin do
         [from, rest] = String.split rest, " ", global: false
 
         case rest do
+          "JOIN :" <> channel ->
+            channel = Mana.Connection.call({ :get, :channel, server, channel })
+            event   = Mana.Event.Join.new(
+              server: server,
+              channel: channel,
+              user:    Mana.User.parse(from))
+
+            plugins = handle(plugins, channel, event)
+            state   = state.plugins(plugins)
+
+          "PART " <> rest ->
+            { channel, reason } = case rest |> String.split " ", global: false do
+              [channel] ->
+                { channel, nil }
+
+              [channel, ":" <> reason] ->
+                { channel, reason }
+            end
+
+            channel = Mana.Connection.call({ :get, :channel, server, channel })
+            event   = Mana.Event.Leave.new(
+              server:  server,
+              channel: channel,
+              user:    Mana.User.parse(from),
+              reason:  reason)
+
+            plugins = handle(plugins, channel, event)
+            state   = state.plugins(plugins)
+
+
           "PRIVMSG " <> rest ->
             [channel, ":" <> message] = rest |> String.split(" ", global: false)
 
             channel = Mana.Connection.call({ :get, :channel, server, channel })
-            message = Mana.Message[ server:  server,
-                                    channel: channel,
-                                    from:    from,
-                                    content: message ]
+            event   = Mana.Event.Message.new(
+              server:  server,
+              channel: channel,
+              user:    Mana.User.parse(from),
+              content: message)
 
-            plugins = Enum.reduce plugins, plugins, fn { name, Plugin[] = plugin }, acc ->
-              if Data.contains?(channel.plugins, name) do
-                plugin_state = case plugin.module.handle(Event[type: :message, data: message], plugin.state) do
-                  { _, plugin_state } ->
-                    plugin_state
-                end
+            plugins = handle(plugins, channel, event)
+            state   = state.plugins(plugins)
 
-                Dict.put(acc, name, plugin.state(plugin_state))
-              else
-                acc
-              end
-            end
+          "422 " <> _ ->
+            connected(server)
 
-            state = state.plugins(plugins)
+          "376 " <> _ ->
+            connected(server)
 
           _ ->
             nil
@@ -105,5 +132,32 @@ defmodule Mana.Plugin do
     end
 
     { :noreply, state }
+  end
+
+  def handle_info({ :EXIT, _, reason }, _state) do
+    IO.inspect reason
+
+    { :noreply, _state }
+  end
+
+  defp handle(plugins, channel, event) do
+    Enum.reduce plugins, plugins, fn { name, Plugin[] = plugin }, acc ->
+      if Data.contains?(channel.plugins, name) do
+        plugin_state = case plugin.module.handle(event, plugin.state) do
+          { _, plugin_state } ->
+            plugin_state
+        end
+
+        Dict.put(acc, name, plugin.state(plugin_state))
+      else
+        acc
+      end
+    end
+  end
+
+  defp connected(server) do
+    Enum.each server.channels, fn { name, _ } ->
+      server.send "JOIN #{name}"
+    end
   end
 end
