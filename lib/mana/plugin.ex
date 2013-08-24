@@ -127,19 +127,31 @@ defmodule Mana.Plugin do
   end
 
   def handle_call({ :call, name, what }, _from, State[plugins: plugins] = state) do
-    case :gen_server.call(Dict.get(plugins, name).module, { :call, what }, @timeout) do
-      { :error, _ } = e ->
-        { :reply, e, state }
+    case Dict.get(plugins, name) do
+      nil ->
+        { :reply, :not_found, state }
 
-      result ->
-        { :reply, result, state }
+      plugin ->
+        case :gen_server.call(plugin.module, { :call, what }, @timeout) do
+          { :error, _ } = e ->
+            { :reply, e, state }
+
+          result ->
+            { :reply, result, state }
+        end
     end
   end
 
   def handle_call({ :event, name, event }, _from, State[plugins: plugins] = state) do
-    :gen_server.cast(Dict.get(plugins, name).module, { :handle, event })
+    case Dict.get(plugins, name) do
+      nil ->
+        { :reply, :not_found, state }
 
-    { :reply, :ok, state }
+      plugin ->
+        :gen_server.cast(plugin.module, { :handle, event })
+
+        { :reply, :ok, state }
+    end
   end
 
   def handle_cast({ :receive, server, line }, State[plugins: plugins] = state) do
