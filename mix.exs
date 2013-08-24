@@ -12,7 +12,7 @@ defmodule Mana.Mixfile do
   def application do
     [ registered: [Mana],
       applications: [:socket, :dexts],
-      mod: { Mana, [] } ]
+      mod: { Mana, [main: "priv", data: "priv/data"] } ]
   end
 
   # Returns the list of dependencies in the format:
