@@ -99,12 +99,12 @@ defmodule Mana.Plugin do
     { :ok, State[options: options] }
   end
 
-  def call(what) do
-    :gen_server.call(__MODULE__, what)
+  def register(name, module) do
+    :gen_server.call(__MODULE__, { :register, name, module }, @timeout)
   end
 
-  def call(plugin, what) do
-    :gen_server.call(__MODULE__, { :call, plugin, what }, @timeout)
+  def call(plugin, what, timeout // 10_000) do
+    :gen_server.call(__MODULE__, { :call, plugin, what }, timeout)
   end
 
   def cast(what) do

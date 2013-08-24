@@ -40,7 +40,7 @@ defmodule Mana do
   end
 
   def plugin(name, module) do
-    case Mana.Plugin.call({ :register, name, module }) do
+    case Mana.Plugin.register(name, module) do
       :ok ->
         :ok
 
