@@ -11,7 +11,7 @@ defmodule Mana.Mixfile do
   # Configuration for the OTP application
   def application do
     [ registered: [Mana],
-      applications: [:socket, :dexts],
+      applications: [:socket, :dexts, :inets],
       mod: { Mana, [main: "priv", data: "priv/data"] } ]
   end
 
