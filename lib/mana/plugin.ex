@@ -10,6 +10,8 @@ defmodule Mana.Plugin do
   defmacro __using__(_opts) do
     quote do
       alias Mana.Event
+      alias Mana.Server
+      alias Mana.Channel
       alias Mana.User
       alias Mana.Plugin
 
