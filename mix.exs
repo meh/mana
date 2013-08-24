@@ -20,6 +20,7 @@ defmodule Mana.Mixfile do
   defp deps do
     [ { :socket, github: "meh/elixir-socket" },
       { :dexts, github: "meh/dexts" },
-      { :continuum, github: "meh/continuum" } ]
+      { :continuum, github: "meh/continuum" },
+      { :exquisite, github: "meh/exquisite" } ]
   end
 end

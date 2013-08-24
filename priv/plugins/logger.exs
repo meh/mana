@@ -58,11 +58,7 @@ defplugin :logger do
     { :ok, table }
   end
 
-  def handle(_, _table) do
-    { :ok, _table }
-  end
-
-  def call({ :get, server, channel }, table) do
+  def call({ :get, server, channel }, table) when is_binary(server) and is_binary(channel) do
     { :ok, table.read({ server, channel }), table }
   end
 

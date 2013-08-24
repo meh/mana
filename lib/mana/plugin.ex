@@ -1,20 +1,75 @@
 defmodule Mana.Plugin do
   use Behaviour
 
-  defcallback init(Keyword.t) :: { :ok, term } | { :error, term }
-  defcallback handle(record, term) :: { :ok, term } | { :error, term }
-  defcallback call(term, term) :: { :ok, term, term } | { :error, term }
+  defcallback handle(record, term) :: { :ok, state :: term } |
+                                      { :error, reason :: term, state :: term }
+
+  defcallback call(term, term) :: { :ok, result :: term, state :: term } |
+                                  { :error, reason :: term, state :: term }
 
   defmacro __using__(_opts) do
     quote do
       alias Mana.Event
+      alias Mana.User
+      alias Mana.Plugin
 
       @behaviour Mana.Plugin
+      @before_compile unquote(__MODULE__)
+
+      defmacrop defer(do: block) do
+        quote do
+          Process.spawn fn ->
+            unquote(block)
+          end
+        end
+      end
 
       def init(_options) do
         { :ok, nil }
       end
 
+      def terminate(_reason, _state) do
+        nil
+      end
+
+      defoverridable init: 1
+      defoverridable terminate: 2
+
+      use GenServer.Behaviour
+
+      def start_link(options) do
+        :gen_server.start_link({ :local, __MODULE__ }, __MODULE__, options, [])
+      end
+
+      def handle_cast({ :handle, event }, state) do
+        case handle(event, state) do
+          { :ok, state } ->
+            { :noreply, state }
+
+          { :error, _reason, state } ->
+            { :noreply, state }
+        end
+      end
+
+      def handle_cast(:terminate, state) do
+        { :stop, :normal, state }
+      end
+
+      def handle_call({ :call, args }, _from, state) do
+        case call(args, state) do
+          { :ok, reply, state } ->
+            { :reply, reply, state }
+
+          { :error, reason, state } ->
+            { :reply, { :error, reason }, state }
+        end
+      end
+
+    end
+  end
+
+  defmacro __before_compile__(_env) do
+    quote do
       def handle(_, state) do
         { :ok, state }
       end
@@ -22,17 +77,15 @@ defmodule Mana.Plugin do
       def call(_, state) do
         { :error, :unimplemented, state }
       end
-
-      defoverridable init: 1
-      defoverridable handle: 2
-      defoverridable call: 2
     end
   end
 
   use GenServer.Behaviour
 
+  @timeout 30_000
+
   defrecord State, options: nil, plugins: []
-  defrecord Plugin, name: nil, module: nil, state: nil
+  defrecord Plugin, name: nil, module: nil, pid: nil
 
   def start_link(options) do
     :gen_server.start_link({ :local, __MODULE__ }, __MODULE__, options, [])
@@ -49,47 +102,47 @@ defmodule Mana.Plugin do
   end
 
   def call(plugin, what) do
-    :gen_server.call(__MODULE__, { :call, plugin, what })
+    :gen_server.call(__MODULE__, { :call, plugin, what }, @timeout)
+  end
+
+  def cast(what) do
+    :gen_server.cast(__MODULE__, what)
   end
 
   def handle_call({ :register, name, module }, _from, State[options: options, plugins: plugins] = state) do
-    case module.init(options) do
-      { :ok, plugin_state } ->
-        plugin = Plugin[name: name, module: module, state: plugin_state]
+    if Dict.has_key?(plugins, name) do
+      :gen_server.cast(module, :terminate)
 
-        { :reply, :ok, state.plugins(Dict.put(plugins, name, plugin)) }
+      { :reply, :restarting, state }
+    else
+      case module.start_link(options) do
+        { :ok, pid } ->
+          { :reply, :ok, state.plugins(Dict.put(plugins, name,
+            Plugin[name: name, module: module, pid: pid])) }
 
-      { :error, _ } = e ->
-        { :reply, e, state }
+        { :error, _ } = e ->
+          { :reply, e, state }
+      end
     end
   end
 
   def handle_call({ :call, name, what }, _from, State[plugins: plugins] = state) do
-    plugin = Dict.get(plugins, name)
+    case :gen_server.call(Dict.get(plugins, name).module, { :call, what }, @timeout) do
+      { :error, _ } = e ->
+        { :reply, e, state }
 
-    case plugin.module.call(what, plugin.state) do
-      { :ok, result, plugin_state } ->
-        { :reply, result, state.plugins(Dict.put(plugins, plugin.name, plugin.state(plugin_state))) }
-
-      { :error, reason, plugin_state } ->
-        { :reply, { :error, reason }, state.plugins(Dict.put(plugins, plugin.name, plugin.state(plugin_state))) }
+      result ->
+        { :reply, result, state }
     end
   end
 
   def handle_call({ :event, name, event }, _from, State[plugins: plugins] = state) do
-    plugin = Dict.get(plugins, name)
-    state  = case plugin.module.event(event, plugin.state) do
-      { :ok, plugin_state } ->
-        state.plugins(Dict.put(plugins, plugin.name, plugin.state(plugin_state)))
+    :gen_server.cast(Dict.get(plugins, name).module, { :handle, event })
 
-      { :error, plugin_state } ->
-        state.plugins(Dict.put(plugins, plugin.name, plugin.state(plugin_state)))
-    end
-
-    { :noreply, state }
+    { :reply, :ok, state }
   end
 
-  def handle_info({ :receive, server, line }, State[plugins: plugins] = state) do
+  def handle_cast({ :receive, server, line }, State[plugins: plugins] = state) do
     case line do
       ":" <> rest ->
         [from, rest] = String.split rest, " ", global: false
@@ -102,8 +155,7 @@ defmodule Mana.Plugin do
               channel: channel,
               user:    Mana.User.parse(from))
 
-            plugins = handle(plugins, channel, event)
-            state   = state.plugins(plugins)
+            handle(plugins, channel, event)
 
           "PART " <> rest ->
             { channel, reason } = case rest |> String.split " ", global: false do
@@ -121,9 +173,7 @@ defmodule Mana.Plugin do
               user:    Mana.User.parse(from),
               reason:  reason)
 
-            plugins = handle(plugins, channel, event)
-            state   = state.plugins(plugins)
-
+            handle(plugins, channel, event)
 
           "PRIVMSG " <> rest ->
             [channel, ":" <> message] = rest |> String.split(" ", global: false)
@@ -135,8 +185,7 @@ defmodule Mana.Plugin do
               user:    Mana.User.parse(from),
               content: message)
 
-            plugins = handle(plugins, channel, event)
-            state   = state.plugins(plugins)
+            handle(plugins, channel, event)
 
           "422 " <> _ ->
             connected(server)
@@ -158,23 +207,25 @@ defmodule Mana.Plugin do
     { :noreply, state }
   end
 
-  def handle_info({ :EXIT, _, reason }, _state) do
-    IO.inspect reason
+  def handle_info({ :EXIT, pid, _reason }, State[plugins: plugins, options: options] = state) do
+    plugin = Enum.find plugins, fn
+      Plugin[pid: ^pid] -> true
+      _                 -> false
+    end
 
-    { :noreply, _state }
+    case plugin && plugin.module.start_link(options) do
+      { :ok, pid } ->
+        { :noreply, state.plugins(Dict.put(plugins, plugin.pid(pid)))  }
+
+      _ ->
+        { :noreply, state }
+    end
   end
 
   defp handle(plugins, channel, event) do
-    Enum.reduce plugins, plugins, fn { name, Plugin[] = plugin }, acc ->
+    Enum.each plugins, fn { name, Plugin[module: module] } ->
       if Data.contains?(channel.plugins, name) do
-        plugin_state = case plugin.module.handle(event, plugin.state) do
-          { _, plugin_state } ->
-            plugin_state
-        end
-
-        Dict.put(acc, name, plugin.state(plugin_state))
-      else
-        acc
+        :gen_server.cast(module, { :handle, event })
       end
     end
   end

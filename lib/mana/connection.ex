@@ -146,7 +146,7 @@ defmodule Mana.Connection do
 
   @doc false
   def reader(socket) do
-    Mana.Plugin <- { :receive, call({ :get, :server, socket }), socket.recv! |> String.strip }
+    Mana.Plugin.cast({ :receive, call({ :get, :server, socket }), socket.recv! |> String.strip })
 
     reader(socket)
   end

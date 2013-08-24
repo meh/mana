@@ -5,8 +5,8 @@ defplugin :control do
     { :ok, State[] }
   end
 
-  def handle(event, _state) do
-    IO.inspect event
+  def handle(Event.Message[content: "I like trains"] = msg, _state) do
+    msg.reply "me too! :DDDDDDDD"
 
     { :ok, _state }
   end

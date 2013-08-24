@@ -36,7 +36,16 @@ defmodule Mana do
   end
 
   def plugin(name, module) do
-    Mana.Plugin.call({ :register, name, module })
+    case Mana.Plugin.call({ :register, name, module }) do
+      :ok ->
+        :ok
+
+      :restarting ->
+        :restarting
+
+      { :error, reason } ->
+        raise reason
+    end
   end
 
   def server(server) do
