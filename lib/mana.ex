@@ -17,13 +17,17 @@ defmodule Mana do
   end
 
   def load(path) do
-    Enum.each Path.wildcard("#{path}/**/*.exs"), fn file ->
-      case File.read(file) do
+    if File.dir?(path) do
+      Enum.each Path.wildcard("#{path}/**/*.exs"), fn file ->
+        load(file)
+      end
+    else
+      case File.read(path) do
         { :ok, content } ->
-          IO.write "Loading #{file}..."
+          IO.write "Loading #{path}..."
 
           try do
-            Code.compile_string "import Mana.DSL; #{content}", file
+            Code.compile_string "import Mana.DSL; #{content}", path
 
             IO.puts " done"
           catch kind, reason ->
