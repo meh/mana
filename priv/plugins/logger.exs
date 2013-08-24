@@ -1,10 +1,4 @@
 defplugin :logger do
-  defrecord User, nick: nil, user: nil, host: nil do
-    @type t :: User[ nick: String.t,
-                     user: String.t,
-                     host: String.t ]
-  end
-
   defrecord Message, in: nil, date: nil, user: nil, content: nil do
     @type t :: Message[ in:      { server :: String.t, channel :: String.t },
                         date:    DateTime.t,
@@ -25,15 +19,24 @@ defplugin :logger do
                       reason: String.t | nil ]
   end
 
-  def init(_options) do
-    { :ok, Dexts.Table.new("logs.dat", type: :duplicate_bag, index: 1) }
+  def init(options) do
+    directory = options[:data] || "."
+    File.mkdir directory
+
+    path = Path.join(directory, "logs.dat")
+
+    { :ok, Dexts.Table.new(path, type: :duplicate_bag, index: 1, automatic: false) }
+  end
+
+  def terminate(_reason, table) do
+    table.close
   end
 
   def handle(Event.Message[server: server, channel: channel, user: user, content: content], table) do
     table.write Message[
       in:      { server.name, channel.name },
       date:    DateTime.now,
-      user:    User[nick: user.nick, user: user.user, host: user.host],
+      user:    user,
       content: content ]
 
     { :ok, table }
@@ -43,7 +46,7 @@ defplugin :logger do
     table.write Join[
       in:      { server.name, channel.name },
       date:    DateTime.now,
-      user:    User[nick: user.nick, user: user.user, host: user.host] ]
+      user:    user ]
 
     { :ok, table }
   end
@@ -52,7 +55,7 @@ defplugin :logger do
     table.write Leave[
       in:      { server.name, channel.name },
       date:    DateTime.now,
-      user:    User[nick: user.nick, user: user.user, host: user.host],
+      user:    user,
       reason:  reason ]
 
     { :ok, table }
