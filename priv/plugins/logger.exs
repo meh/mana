@@ -23,12 +23,19 @@ defplugin :logger do
     directory = options[:data] || "."
     File.mkdir directory
 
-    path = Path.join(directory, "logs.dat")
+    path  = Path.join(directory, "logs.dat")
+    table = Dexts.Table.new(path,
+      type: :duplicate_bag,
+      index: 1,
+      automatic: false,
+      asynchronous: true,
+      save_every: 30_000)
 
-    { :ok, Dexts.Table.new(path, type: :duplicate_bag, index: 1, automatic: false) }
+    { :ok, table }
   end
 
   def terminate(_reason, table) do
+    table.save
     table.close
   end
 
