@@ -52,7 +52,7 @@ defmodule Mana do
     end
   end
 
-  def server(server) do
+  def connect(server) do
     Mana.Connection.call({ :connect, server })
   end
 

@@ -20,17 +20,33 @@ defmodule Mana.DSL do
   defmacro defserver(host, port, options, do: block) when is_integer(port) do
     quote do
       server = Mana.Server.make(unquote(host), unquote(port), unquote(options))
-      Mana.server server
-
       unquote(block)
+      Mana.connect server
+    end
+  end
 
-      server = nil
+  defmacro nick(value) do
+    quote do
+      server = server.nick(unquote(value))
+    end
+  end
+
+  defmacro user(value) do
+    quote do
+      server = server.user(unquote(value))
+    end
+  end
+
+  defmacro realname(value) do
+    quote do
+      server = server.realname(unquote(value))
     end
   end
 
   defmacro defchannel(name, options // []) do
     quote do
-      Mana.join Mana.Channel.make(server, unquote(name), unquote(options))
+      server = server.channels(Dict.put(server.channels, unquote(name),
+        Mana.Channel.make(server, unquote(name), unquote(options))))
     end
   end
 

@@ -1,4 +1,13 @@
-defrecord Mana.Server, name: nil, host: nil, port: nil, secure: false, password: nil, channels: [], plugins: [] do
+defrecord Mana.Server, name:     nil,
+                       host:     nil,
+                       port:     nil,
+                       secure:   false,
+                       nick:     "Mana",
+                       user:     "Mana",
+                       realname: "Succubus begone.",
+                       password: nil,
+                       channels: [],
+                       plugins:  [] do
   alias Data.Set
   alias Data.Set.List, as: ListSet
 

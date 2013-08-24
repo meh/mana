@@ -17,7 +17,7 @@ defmodule Mana.Connection do
     { :ok, State[options: options, connections: []] }
   end
 
-  defp connect(Server[host: host, port: port, secure: secure, password: password] = server) do
+  defp connect(Server[host: host, port: port, secure: secure, nick: nick, user: user, realname: realname, password: password] = server) do
     socket = if secure do
       Socket.SSL.connect!(host, port, packet: :line, automatic: false)
     else
@@ -28,8 +28,8 @@ defmodule Mana.Connection do
       socket |> write "PASS #{password}"
     end
 
-    socket |> write "NICK Mana"
-    socket |> write "USER Mana * * :Succubus begone."
+    socket |> write "NICK #{nick}"
+    socket |> write "USER #{user} * * :#{realname}"
 
     Connection[ server: server,
                 socket: socket,
@@ -66,8 +66,6 @@ defmodule Mana.Connection do
   def handle_call({ :join, channel }, _from, State[connections: connections] = state) do
     conn = Dict.get(connections, channel.server)
     conn = Dict.put(conn.server.channels, channel.name, channel) |> conn.server.channels |> conn.server
-
-    conn.socket |> write "JOIN #{channel.name}"
 
     { :reply, :ok, Dict.put(connections, conn.server.name, conn) |> state.connections }
   end
