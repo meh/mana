@@ -209,15 +209,21 @@ defmodule Mana.Plugin do
 
   def handle_info({ :EXIT, pid, _reason }, State[plugins: plugins, options: options] = state) do
     plugin = Enum.find plugins, fn
-      Plugin[pid: ^pid] -> true
-      _                 -> false
+      { _, Plugin[pid: ^pid] } -> true
+      { _, _ }                 -> false
     end
 
-    case plugin && plugin.module.start_link(options) do
-      { :ok, pid } ->
-        { :noreply, state.plugins(Dict.put(plugins, plugin.pid(pid)))  }
+    case plugin do
+      { name, plugin } ->
+        case plugin.module.start_link(options) do
+          { :ok, pid } ->
+            { :noreply, state.plugins(Dict.put(plugins, name, plugin.pid(pid))) }
 
-      _ ->
+          _ ->
+            { :noreply, state }
+        end
+
+      nil ->
         { :noreply, state }
     end
   end
