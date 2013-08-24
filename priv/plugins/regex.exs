@@ -20,10 +20,12 @@ defplugin :regex do
 
         if modified do
           msg.reply "<#{modified.user.nick}> #{modified.content}"
+        else
+          msg.reply "#{nick}, no match for your uniquiry."
         end
 
       { :error, { reason, column } } ->
-        msg.reply "#{nick}, lrn2regex: #{reason} at column #{column}"
+        msg.reply "#{nick}, your regex is invalid kind sir: #{reason} at column #{column}"
     end
 
     { :ok, _state }
