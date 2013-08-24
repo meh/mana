@@ -63,6 +63,10 @@ defplugin :logger do
   end
 
   def call({ :query, query }, table) do
-    { :ok, table.select(query).values, table }
+    if selector = table.select(query) do
+      { :ok, selector.values, table }
+    else
+      { :ok, [], table }
+    end
   end
 end
