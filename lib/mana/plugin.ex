@@ -7,6 +7,9 @@ defmodule Mana.Plugin do
   defcallback call(term, term) :: { :ok, result :: term, state :: term } |
                                   { :error, reason :: term, state :: term }
 
+  defcallback info(term, term) :: { :ok, state :: term } |
+                                  { :error, reason :: term, state :: term }
+
   defmacro __using__(_opts) do
     quote do
       alias Mana.Event
@@ -67,6 +70,15 @@ defmodule Mana.Plugin do
         end
       end
 
+      def handle_info(term, state) do
+        case info(term, state) do
+          { :ok, state } ->
+            { :noreply, state }
+
+          { :error, _reason, state } ->
+            { :noreply, state }
+        end
+      end
     end
   end
 
@@ -78,6 +90,10 @@ defmodule Mana.Plugin do
 
       def call(_, state) do
         { :error, :unimplemented, state }
+      end
+
+      def info(_, state) do
+        { :ok, state }
       end
     end
   end
