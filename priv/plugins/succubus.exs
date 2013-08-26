@@ -6,6 +6,10 @@ defplugin :succubus do
     :timer.send_interval DateTime.to_seconds(minutes: 30) * 1000, :trigger
   end
 
+  def terminate(_, { :interval, ref }) do
+    :timer.cancel(ref)
+  end
+
   def info(:trigger, _state) do
     Enum.each Plugin.call(:logger, :list), fn { server, channel } ->
       query = Exquisite.match msg in Plugin.Logger.Message[in: { server, channel }],
@@ -23,10 +27,11 @@ defplugin :succubus do
 
         danger = if result == :female do
           cond do
-            percent > 90 -> :ultra
-            percent > 80 -> :high
-            percent > 70 -> :medium
-            percent > 60 -> :low
+            percent > 98 -> :ultra
+            percent > 95 -> :mega
+            percent > 90 -> :high
+            percent > 80 -> :medium
+            percent > 70 -> :low
             true         -> :none
           end
         else
@@ -44,7 +49,8 @@ defplugin :succubus do
             :low    -> 1
             :medium -> 2
             :high   -> 3
-            :ultra  -> 4
+            :mega   -> 4
+            :ultra  -> 5
           end
         end
 
@@ -57,9 +63,26 @@ defplugin :succubus do
     { :ok, _state }
   end
 
+  def call({ :stats, nick }, _state) do
+    query = Exquisite.match msg in Plugin.Logger.Message[user: User],
+      where: msg.user.nick == nick
+
+    messages = Enum.map Plugin.call(:logger, { :query, query }, 30_000), &(&1.content)
+
+    { _, { _, _, _ } = stats } = messages
+      |> Enum.map(&String.split(&1, %r/[^a-zA-Z']+/))
+      |> List.flatten
+      |> weight()
+
+    { :ok, stats, _state }
+  end
+
   defp alert(server, channel, user, danger) do
     message = case danger do
       :ultra ->
+        "Succubus confirmed, it's #{user}."
+
+      :mega ->
         "Hide your mana, we have a hungry succubus here, her name starts with #{user |> String.slice(0, 1) |> String.upcase}"
 
       :high ->
