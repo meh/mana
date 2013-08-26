@@ -57,10 +57,12 @@ defmodule Mana.DSL do
       module = Module.concat(Mana.Plugin, unquote(module))
 
       :code.delete(module)
+      :code.purge(module)
 
       Enum.each :code.all_loaded, fn { mod, _ } ->
         if to_string(mod) |> String.starts_with?(to_string(module) <> ".") do
           :code.delete(mod)
+          :code.purge(mod)
         end
       end
 
