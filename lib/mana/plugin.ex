@@ -110,7 +110,11 @@ defmodule Mana.Plugin do
   end
 
   def init(options) do
-    Process.flag(:trap_exit, true)
+    if main = options[:main] do
+      Process.spawn fn ->
+        Mana.load main
+      end
+    end
 
     { :ok, State[options: options] }
   end
