@@ -1,4 +1,4 @@
-defrecord Mana.Event.Number, server: nil, number: nil, details: nil do
+defrecord Mana.Event.Numeric, server: nil, number: nil, details: nil do
   def make(server, number, rest) do
     __MODULE__[server: server, number: number, details: rest]
   end

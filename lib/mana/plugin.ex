@@ -228,7 +228,7 @@ defmodule Mana.Plugin do
           << a :: utf8, b :: utf8, c :: utf8, ?\s :: utf8, rest :: binary >> when a in ?0 .. ?9 and
                                                                                   b in ?0 .. ?9 and
                                                                                   c in ?0 .. ?9 ->
-            handle(plugins, server, Event.Number.make(server,
+            handle(plugins, server, Event.Numeric.make(server,
               binary_to_integer(<< a :: utf8, b :: utf8, c :: utf8 >>), rest))
 
           _ ->
