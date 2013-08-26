@@ -1,4 +1,4 @@
-defserver "irc.wizardchan.org", plugins: [:control, :logger, :url, :eightball, :regex] do
+defserver "irc.wizardchan.org", plugins: [:control, :logger, :url, :eightball, :regex, :autojoin] do
   nick     "Mana"
   user     "Mana"
   realname "Succubus begone."
