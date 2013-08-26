@@ -58,7 +58,7 @@ defplugin :url do
                        index: last + index + 1,
                        date:  DateTime.now,
                        user:  user,
-                       info:  URI.parse(uri) ])
+                       info:  URI.parse(location(uri)) ])
     end
 
     { :ok, { indices |> Dict.put({ server.name, channel.name }, last + length(urls)), table } }
@@ -104,6 +104,22 @@ defplugin :url do
     case :httpc.request("http://is.gd/create.php?format=simple&url=#{URI.encode(uri)}" |> String.to_char_list!) do
       { :ok, { _, _, body } } ->
         body |> String.from_char_list!
+
+      { :error, _ } ->
+        uri
+    end
+  end
+
+  defp location(uri) do
+    uri = to_string(uri)
+
+    case :httpc.request(:head, { uri |> String.to_char_list!, [] }, [autoredirect: false], []) do
+      { :ok, { _, headers, _ } } ->
+        if loc = headers['location'] do
+          location(loc)
+        else
+          uri
+        end
 
       { :error, _ } ->
         uri
