@@ -100,6 +100,10 @@ defmodule Mana.Plugin do
 
   use GenServer.Behaviour
 
+  alias Mana.Connection
+  alias Mana.Event
+  alias Mana.User
+
   @timeout 30_000
 
   defrecord State, options: nil, plugins: []
@@ -183,11 +187,11 @@ defmodule Mana.Plugin do
 
         case rest do
           "JOIN :" <> channel ->
-            channel = Mana.Connection.call({ :get, :channel, server, channel })
-            event   = Mana.Event.Join.new(
+            channel = Connection.call({ :get, :channel, server, channel })
+            event   = Event.Join.new(
               server: server,
               channel: channel,
-              user:    Mana.User.parse(from))
+              user:    User.parse(from))
 
             handle(plugins, channel, event)
 
@@ -200,11 +204,11 @@ defmodule Mana.Plugin do
                 { channel, reason }
             end
 
-            channel = Mana.Connection.call({ :get, :channel, server, channel })
-            event   = Mana.Event.Leave.new(
+            channel = Connection.call({ :get, :channel, server, channel })
+            event   = Event.Leave.new(
               server:  server,
               channel: channel,
-              user:    Mana.User.parse(from),
+              user:    User.parse(from),
               reason:  reason)
 
             handle(plugins, channel, event)
@@ -212,20 +216,20 @@ defmodule Mana.Plugin do
           "PRIVMSG " <> rest ->
             [channel, ":" <> message] = rest |> String.split(" ", global: false)
 
-            channel = Mana.Connection.call({ :get, :channel, server, channel })
-            event   = Mana.Event.Message.new(
+            channel = Connection.call({ :get, :channel, server, channel })
+            event   = Event.Message.new(
               server:  server,
               channel: channel,
-              user:    Mana.User.parse(from),
+              user:    User.parse(from),
               content: message)
 
             handle(plugins, channel, event)
 
-          "422 " <> _ ->
-            connected(server)
-
-          "376 " <> _ ->
-            connected(server)
+          << a :: utf8, b :: utf8, c :: utf8, ?\s :: utf8, rest :: binary >> when a in ?0 .. ?9 and
+                                                                                  b in ?0 .. ?9 and
+                                                                                  c in ?0 .. ?9 ->
+            handle(plugins, server, Event.Number.make(server,
+              binary_to_integer(<< a :: utf8, b :: utf8, c :: utf8 >>), rest))
 
           _ ->
             nil
@@ -262,17 +266,11 @@ defmodule Mana.Plugin do
     end
   end
 
-  defp handle(plugins, channel, event) do
+  defp handle(plugins, thing, event) do
     Enum.each plugins, fn { name, Plugin[module: module] } ->
-      if Data.contains?(channel.plugins, name) do
+      if Data.contains?(thing.plugins, name) do
         :gen_server.cast(module, { :handle, event })
       end
-    end
-  end
-
-  defp connected(server) do
-    Enum.each server.channels, fn { name, _ } ->
-      server.send "JOIN #{name}"
     end
   end
 end
