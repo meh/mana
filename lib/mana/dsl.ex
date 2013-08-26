@@ -56,6 +56,14 @@ defmodule Mana.DSL do
     quote do
       module = Module.concat(Mana.Plugin, unquote(module))
 
+      :code.delete(module)
+
+      Enum.each :code.all_loaded, fn { mod, _ } ->
+        if to_string(mod) |> String.starts_with?(to_string(module) <> ".") do
+          :code.delete(mod)
+        end
+      end
+
       defmodule module do
         use Mana.Plugin
 
