@@ -189,7 +189,7 @@ defmodule Mana.Plugin do
               channel: channel,
               user:    User.parse(from))
 
-            handle(plugins, channel, event)
+            handle_event(plugins, channel, event)
 
           "PART " <> rest ->
             { channel, reason } = case rest |> String.split " ", global: false do
@@ -207,7 +207,7 @@ defmodule Mana.Plugin do
               user:    User.parse(from),
               reason:  reason)
 
-            handle(plugins, channel, event)
+            handle_event(plugins, channel, event)
 
           "PRIVMSG " <> rest ->
             [channel, ":" <> message] = rest |> String.split(" ", global: false)
@@ -219,15 +219,15 @@ defmodule Mana.Plugin do
               user:    User.parse(from),
               content: message)
 
-            handle(plugins, channel, event)
+            handle_event(plugins, channel, event)
 
           "NICK " <> rest ->
-            handle(plugins, server, Event.Nick[server: server, old: from.nick, new: rest])
+            handle_event(plugins, server, Event.Nick[server: server, old: from.nick, new: rest])
 
           << a :: utf8, b :: utf8, c :: utf8, ?\s :: utf8, rest :: binary >> when a in ?0 .. ?9 and
                                                                                   b in ?0 .. ?9 and
                                                                                   c in ?0 .. ?9 ->
-            handle(plugins, server, Event.Numeric.make(server,
+            handle_event(plugins, server, Event.Numeric.make(server,
               binary_to_integer(<< a :: utf8, b :: utf8, c :: utf8 >>), rest))
 
           _ ->
@@ -265,7 +265,7 @@ defmodule Mana.Plugin do
     end
   end
 
-  defp handle(plugins, thing, event) do
+  defp handle_event(plugins, thing, event) do
     Enum.each plugins, fn { name, Plugin[module: module] } ->
       if Data.contains?(thing.plugins, name) do
         :gen_server.cast(module, { :handle, event })
