@@ -104,8 +104,6 @@ defmodule Mana.Plugin do
   alias Mana.Event
   alias Mana.User
 
-  @timeout 30_000
-
   defrecord State, options: nil, plugins: []
   defrecord Plugin, name: nil, module: nil, pid: nil
 
@@ -126,11 +124,12 @@ defmodule Mana.Plugin do
   end
 
   def register(name, module) do
-    :gen_server.call(__MODULE__, { :register, name, module }, @timeout)
+    :gen_server.call(__MODULE__, { :register, name, module }, :infinity)
   end
 
   def call(plugin, what, timeout // 10_000) do
-    :gen_server.call(__MODULE__, { :call, plugin, what }, timeout)
+    :gen_server.call(__MODULE__, { :module, plugin })
+      |> :gen_server.call({ :call, what }, timeout)
   end
 
   def cast(what) do
@@ -154,20 +153,15 @@ defmodule Mana.Plugin do
     end
   end
 
-  def handle_call({ :call, name, what }, _from, State[plugins: plugins] = state) do
+  def handle_call({ :module, name }, _from, State[plugins: plugins] = _state) do
     case Dict.get(plugins, name) do
       nil ->
-        { :reply, :not_found, state }
+        { :reply, :not_found, _state }
 
       plugin ->
-        case :gen_server.call(plugin.module, { :call, what }, @timeout) do
-          { :error, _ } = e ->
-            { :reply, e, state }
-
-          result ->
-            { :reply, result, state }
-        end
+        { :reply, plugin.module, _state }
     end
+
   end
 
   def handle_call({ :event, name, event }, _from, State[plugins: plugins] = state) do
