@@ -79,4 +79,8 @@ defplugin :logger do
       { :ok, [], table }
     end
   end
+
+  def call(:list, table) do
+    { :ok, table.keys, table }
+  end
 end
