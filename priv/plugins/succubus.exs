@@ -27,12 +27,12 @@ defplugin :succubus do
 
         danger = if result == :female do
           cond do
-            percent > 98 -> :ultra
-            percent > 95 -> :mega
-            percent > 90 -> :high
-            percent > 80 -> :medium
-            percent > 70 -> :low
-            true         -> :none
+            percent >= 99 -> :ultra
+            percent >= 95 -> :mega
+            percent >= 90 -> :high
+            percent >= 80 -> :medium
+            percent >= 70 -> :low
+            true          -> :none
           end
         else
           :none
