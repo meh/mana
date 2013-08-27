@@ -3,7 +3,7 @@ defplugin :succubus do
   alias   Data.Dict
 
   def init(_options) do
-    :timer.send_interval DateTime.to_seconds(minutes: 30) * 1000, :trigger
+    :timer.send_interval DateTime.to_seconds(hours: 4) * 1000, :trigger
   end
 
   def terminate(_, { :interval, ref }) do
