@@ -5,7 +5,7 @@ defmodule Mana.Connection do
   alias Mana.Server
 
   defrecord State, connections: nil, options: nil
-  defrecord Connection, server: nil, socket: nil, reader: nil, writer: nil
+  defrecord Connection, server: nil, socket: nil
 
   def start_link(options) do
     :gen_server.start_link({ :local, __MODULE__ }, __MODULE__, options, [])
@@ -19,9 +19,9 @@ defmodule Mana.Connection do
 
   defp connect(Server[host: host, port: port, secure: secure, nick: nick, user: user, realname: realname, password: password] = server) do
     socket = if secure do
-      Socket.SSL.connect!(host, port, packet: :line, automatic: false)
+      Socket.SSL.connect!(host, port, packet: :line, mode: :active, automatic: false)
     else
-      Socket.TCP.connect!(host, port, packet: :line, automatic: false)
+      Socket.TCP.connect!(host, port, packet: :line, mode: :active, automatic: false)
     end
 
     if password do
@@ -31,14 +31,11 @@ defmodule Mana.Connection do
     socket |> write "NICK #{nick}"
     socket |> write "USER #{user} * * :#{realname}"
 
-    Connection[ server: server,
-                socket: socket,
-                reader: Process.spawn_link(__MODULE__, :reader, [socket]),
-                writer: Process.spawn_link(__MODULE__, :writer, [socket]) ]
+    Connection[server: server, socket: socket]
   end
 
   defp write(socket, line) do
-    socket.send([line, ?\r, ?\n])
+    socket |> Socket.Stream.send! [line, ?\r, ?\n]
   end
 
   def call(what) do
@@ -47,11 +44,9 @@ defmodule Mana.Connection do
 
   def send(what, options // []) do
     if to = options[:to] do
-      call({ :get, :writer, to }) <- what
+      call { :write, to, what }
     else
-      Enum.each call({ :all, :writer }), fn { _, pid } ->
-        pid <- what
-      end
+      call { :write, :all, what }
     end
   end
 
@@ -70,36 +65,6 @@ defmodule Mana.Connection do
     { :reply, :ok, Dict.put(connections, conn.server.name, conn) |> state.connections }
   end
 
-  def handle_call({ :all, what }, _from, State[connections: connections] = state) when what in %w[writer reader]a do
-    result = Enum.map connections, fn { name, Connection[reader: reader, writer: writer] } ->
-      { name, case what do
-        :writer -> writer
-        :reader -> reader
-      end }
-    end
-
-    { :reply, result, state }
-  end
-
-  def handle_call({ :get, what, name }, _from, State[connections: connections] = state) when what in %w[writer reader]a do
-    if name |> is_record Server do
-      name = name.name
-    end
-
-    pid = Enum.find_value connections, fn
-      { ^name, Connection[reader: reader, writer: writer] } ->
-        case what do
-          :writer -> writer
-          :reader -> reader
-        end
-
-      _ ->
-        false
-    end
-
-    { :reply, pid, state }
-  end
-
   def handle_call({ :get, :server, socket }, _from, State[connections: connections] = state) do
     server = Enum.find_value connections, fn { _, Connection[server: server, socket: ^socket] } ->
       server
@@ -116,46 +81,47 @@ defmodule Mana.Connection do
     { :reply, connections |> Dict.get(server) |> Connection.server |> Server.channels |> Dict.get(name), state }
   end
 
-  def handle_info({ :EXIT, pid, reason }, _from, State[connections: connections] = state) do
-    if reason == :reconnect do
-      { :noreply, state }
-    else
-      { server, conn } = Enum.find connections, fn
-        { _, Connection[reader: ^pid] } -> true
-        { _, Connection[writer: ^pid] } -> true
-        _                               -> false
-      end
-
-      connections = if pid == conn.reader do
-        Process.exit conn.writer, :reconnect
-        conn.socket.close
-
-        Dict.put(connections, server, connect(conn.server))
-      else
-        Process.exit conn.reader, :reconnect
-
-        Dict.put(connections, server,
-          conn.writer(Process.spawn_link(__MODULE__, :writer, [conn.socket])))
-      end
-
-      { :noreply, state.connections(connections) }
-    end
-  end
-
-  @doc false
-  def reader(socket) do
-    Mana.Plugin.cast({ :receive, call({ :get, :server, socket }), socket.recv! |> String.strip })
-
-    reader(socket)
-  end
-
-  @doc false
-  def writer(socket) do
-    receive do
-      line when is_binary(line) ->
-        socket.send!([line, ?\r, ?\n])
+  def handle_call({ :write, :all, message }, _from, State[connections: connections] = _state) do
+    Enum.each connections, fn { _name, Connection[socket: socket] } ->
+      socket |> Socket.Stream.send! [message, "\r\n"]
     end
 
-    writer(socket)
+    { :reply, :ok, _state }
+  end
+
+  def handle_call({ :write, name, message }, _from, State[connections: connections] = _state) do
+    if name |> is_record Server do
+      name = name.name
+    end
+
+    Dict.get(connections, name).socket |> Socket.Stream.send! [message, "\r\n"]
+
+    { :reply, :ok, _state }
+  end
+
+  def handle_info({ :tcp, socket, line }, State[connections: connections] = _state) do
+    Mana.Plugin.cast { :receive, server_for(connections, socket), line |> String.rstrip }
+
+    { :noreply, _state }
+  end
+
+  def handle_info({ :tcp_closed, socket }, State[connections: connections] = state) do
+    server = server_for(connections, socket)
+
+    { :noreply, state.connections(connections |> Dict.put(server.name, connect(server))) }
+  end
+
+  def handle_info({ :tcp_error, socket, _reason }, State[connections: connections] = state) do
+    server = server_for(connections, socket)
+
+    { :noreply, state.connections(connections |> Dict.put(server.name, connect(server))) }
+  end
+
+  defp server_for(connections, socket) do
+    Enum.find_value connections, fn { _name, Connection[server: server, socket: sock] } ->
+      if Socket.equal?(socket, sock) do
+        server
+      end
+    end
   end
 end
