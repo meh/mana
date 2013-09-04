@@ -222,7 +222,9 @@ defmodule Mana.Plugin do
             handle_event(plugins, channel, event)
 
           "NICK " <> rest ->
-            handle_event(plugins, server, Event.Nick[server: server, old: from.nick, new: rest])
+            user = User.parse(from)
+
+            handle_event(plugins, server, Event.Nick[server: server, user: user, nick: rest])
 
           << a :: utf8, b :: utf8, c :: utf8, ?\s :: utf8, rest :: binary >> when a in ?0 .. ?9 and
                                                                                   b in ?0 .. ?9 and

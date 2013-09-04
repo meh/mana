@@ -4,7 +4,7 @@ defrecord Mana.Event.Numeric, server: nil, number: nil, details: nil do
   end
 end
 
-defrecord Mana.Event.Nick, server: nil, old: nil, new: nil
+defrecord Mana.Event.Nick, server: nil, user: nil, nick: nil
 
 defrecord Mana.Event.Message, server: nil, channel: nil, user: nil, content: nil do
   def reply(message, __MODULE__[server: server, channel: channel]) do
