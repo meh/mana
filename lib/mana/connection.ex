@@ -19,9 +19,9 @@ defmodule Mana.Connection do
 
   defp connect(Server[host: host, port: port, secure: secure, nick: nick, user: user, realname: realname, password: password] = server) do
     socket = if secure do
-      Socket.SSL.connect!(host, port, packet: :line, mode: :active, automatic: false)
+      Socket.SSL.connect!(host, port, packet: :line, mode: :active)
     else
-      Socket.TCP.connect!(host, port, packet: :line, mode: :active, automatic: false)
+      Socket.TCP.connect!(host, port, packet: :line, mode: :active)
     end
 
     if password do
