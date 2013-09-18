@@ -14,5 +14,6 @@ end
 
 defrecord Mana.Event.Leave, server: nil, channel: nil, user: nil, reason: nil
 defrecord Mana.Event.Join, server: nil, channel: nil, user: nil
-defrecord Mana.Event.Kick, server: nil, channel: nil, sender: nil, user: nil, reason: nil
-defrecord Mana.Event.Ban, server: nil, channel: nil, sender: nil, mask: nil
+defrecord Mana.Event.Kick, server: nil, channel: nil, user: nil, kicked: nil, reason: nil
+defrecord Mana.Event.Ban, server: nil, channel: nil, user: nil, mask: nil
+defrecord Mana.Event.Quit, server: nil, user: nil, reason: nil

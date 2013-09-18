@@ -226,6 +226,11 @@ defmodule Mana.Plugin do
 
             handle_event(plugins, server, Event.Nick[server: server, user: user, nick: rest])
 
+          "QUIT :" <> reason ->
+            user = User.parse(from)
+
+            handle_event(plugins, server, Event.Quit[server: server, user: user, reason: reason])
+
           << a :: utf8, b :: utf8, c :: utf8, ?\s :: utf8, rest :: binary >> when a in ?0 .. ?9 and
                                                                                   b in ?0 .. ?9 and
                                                                                   c in ?0 .. ?9 ->
