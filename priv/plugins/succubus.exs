@@ -63,6 +63,33 @@ defplugin :succubus do
     { :ok, _state }
   end
 
+  def call(:stats, _state) do
+    query    = Exquisite.match msg in Plugin.Logger.Message[]
+    messages = Enum.reduce Plugin.call(:logger, { :query, query }, 30_000), HashDict.new, fn
+      Plugin.Logger.Message[user: user, content: content], acc ->
+        Dict.update(acc, user.nick, [], &[content | &1])
+    end
+
+    stats = Enum.map messages, fn { nick, messages } ->
+      { _, { _, _, _ } = stats } = messages
+        |> Enum.map(&String.split(&1, %r/[^a-zA-Z']+/))
+        |> List.flatten
+        |> weight()
+
+      { nick, stats }
+    end
+
+    stats = Enum.filter stats, fn { _, stats } ->
+      stats != { 0, 0, 0 }
+    end
+
+    stats = Enum.sort stats, fn { _, { a, _, _ } }, { _, { b, _, _ } } ->
+      a > b
+    end
+
+    { :ok, stats, _state }
+  end
+
   def call({ :stats, nick }, _state) do
     query = Exquisite.match msg in Plugin.Logger.Message[user: User],
       where: msg.user.nick == nick
