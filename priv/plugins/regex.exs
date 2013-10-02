@@ -21,7 +21,7 @@ defplugin :regex do
         if modified do
           msg.reply "<#{modified.user.nick}> #{modified.content}"
         else
-          msg.reply "#{nick}, no match for your uniquiry."
+          msg.reply "#{nick}, no match for your inquiry."
         end
 
       { :error, { reason, column } } ->
